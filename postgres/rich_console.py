@@ -18,44 +18,68 @@ def fix_arabic_text(text):
     return get_display(reshaped_text)
 
 
-def highlight_query(content, query):
+def highlight_query(content: str, query: str) -> str:
     """
-    Highlights a query term within a content string.
-    This function operates on the logical, original string before visual
-    reordering for Arabic/Persian display.
+    Highlight query terms in content. Works for multilingual text.
     """
-    query_terms = query.split()
-    highlighted_content = content
+    if not query:
+        return content
 
-    # Iterate through each term in the query.
-    for term in query_terms:
-        # Use regex to find the term. re.escape() handles special characters.
-        # The (?i) flag is for case-insensitive matching in Latin scripts.
-        # For Persian, the normalization of the query and content is more important.
-        try:
-            highlighted_content = re.sub(
-                re.escape(term),
-                f"[bold yellow]{term}[/bold yellow]",
-                highlighted_content,
-                flags=re.IGNORECASE,
-            )
-        except Exception as e:
-            # If highlighting fails, return the original content to prevent
-            # the program from crashing.
-            print(f"Error highlighting term '{term}': {e}")
-            return content
+    terms = [t for t in query.split() if t.strip()]
+    if not terms:
+        return content
 
-    return highlighted_content
+    # Sort terms by length in descending order to match longer terms first
+    terms = sorted(set(terms), key=len, reverse=True)
+
+    out = content
+    for term in terms:
+        # Use regex to find the term. The (?i) flag is for case-insensitive matching.
+        pattern = re.compile(re.escape(term), re.IGNORECASE)
+
+        # Replace using a lambda function to preserve case and formatting of the matched text
+        out = pattern.sub(lambda m: f"[bold yellow]{m.group(0)}[/bold yellow]", out)
+    return out
 
 
-def truncate_at_word(text, max_length=80):
+def truncate_at_word(text: str, max_length: int) -> str:
     """
-    Truncates a string at a word boundary to a maximum length.
+    Truncates a rich-formatted string at a word boundary to a maximum length.
+    Preserves rich markup tags while counting characters.
     """
-    if len(text) <= max_length:
-        return text
-    truncated = text[:max_length].rsplit(" ", 1)[0]
-    return truncated + "..." if len(truncated) < len(text) else text
+    plain_text_len = 0
+    truncated_text = ""
+    in_tag = False
+
+    for i, char in enumerate(text):
+        if char == "[" and not in_tag:
+            # Found start of a tag
+            in_tag = True
+            truncated_text += char
+        elif char == "]" and in_tag:
+            # Found end of a tag
+            in_tag = False
+            truncated_text += char
+        elif not in_tag:
+            # Regular character
+            if plain_text_len >= max_length:
+                # Truncation point reached. Find the last space.
+                last_space = truncated_text.rfind(" ")
+                if last_space != -1:
+                    # Truncate at the last space and add ellipsis
+                    return truncated_text[:last_space] + "..."
+                else:
+                    # No space found, truncate directly
+                    return truncated_text + "..."
+
+            truncated_text += char
+            plain_text_len += 1
+        else:
+            # Inside a tag, just append character
+            truncated_text += char
+
+    # If the whole string fits, return it as is
+    return truncated_text
 
 
 def display_results(results, query=""):
@@ -72,12 +96,16 @@ def display_results(results, query=""):
     lang_map = {"en": "English", "fa": "Persian", "id": "Indonesian", None: "Unknown"}
 
     for doc_id, content, score, language, created_at in results:
-        # 1. Highlight the content first on the logical string
+        # Step 1: Highlight the content on the logical string
         content_display = highlight_query(content, query)
-        # 2. Fix the Arabic/Persian text for visual display
-        content_display = fix_arabic_text(content_display)
-        # 3. Truncate the text for display purposes
-        content_display = truncate_at_word(content_display, 80)
+
+        # Step 2: Truncate the text, correctly preserving markup
+        content_display = truncate_at_word(content_display, 100)
+
+        # Step 3: Fix the Arabic/Persian text for visual display.
+        # This must be the last step to avoid corrupting rich markup.
+        if language == "fa":  # Only for Persian
+            content_display = fix_arabic_text(content_display)
 
         score_style = "green" if score > 0.7 else "yellow" if score > 0.4 else "red"
         language_display = lang_map.get(language, language or "Unknown").capitalize()

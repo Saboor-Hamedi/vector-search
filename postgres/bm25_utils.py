@@ -10,8 +10,10 @@ def update_bm25_index(cursor, normalize_content):
     rows = cursor.fetchall()
     bm25_corpus = [(row[0], normalize_content(row[1])) for row in rows]
     tokenized = [content.split() for _, content in bm25_corpus if content.strip()]
-    # Filter out empty documents
     valid_tokenized = list(filter(lambda x: len(x) > 0, tokenized))
+
+    # Filter out empty documents
+    valid_tokenized = [tokens for tokens in tokenized if tokens]
 
     if not valid_tokenized:
         bm25_index = None
