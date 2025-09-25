@@ -5,9 +5,6 @@ from rich_console import display_results
 from text_properties import normalize_content
 from languages import detect_language
 from bm25_utils import update_bm25_index, bm25_index, bm25_corpus
-import re
-import sys
-import os
 
 from ColorScheme import ColorScheme
 
