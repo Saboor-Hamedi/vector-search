@@ -1,5 +1,7 @@
 from rank_bm25 import BM25Okapi
+from ColorScheme import ColorScheme
 
+cs = ColorScheme()
 bm25_corpus = []
 bm25_index = None
 
@@ -20,4 +22,4 @@ def update_bm25_index(cursor, normalize_content):
         bm25_corpus = []
         return
     bm25_index = BM25Okapi(valid_tokenized)
-    print(f"BM25 index updated with {len(bm25_corpus)} documents")
+    print(f"BM25 index updated with {cs.BOLD}{len(bm25_corpus)}{cs.NORMAL} documents")

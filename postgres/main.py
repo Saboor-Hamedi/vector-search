@@ -6,13 +6,21 @@ from text_properties import normalize_content
 from languages import detect_language
 from bm25_utils import update_bm25_index, bm25_index, bm25_corpus
 import re
+import sys
+import os
 
+from ColorScheme import ColorScheme
+
+cs = ColorScheme()
+
+# call the ColorScheme with re here
 DEFAULT_TOP_K = 100
 DEFAULT_THRESHOLD = 0.4
 BM25_WEIGHT = 0.5
 conn = db_connection()
 cursor = conn.cursor()
 
+print(f"{cs.RED} Connected to the database successfully.{cs.RESET}")
 
 model = ai_model("paraphrase-multilingual-MiniLM-L12-v2")
 
@@ -37,22 +45,25 @@ def insert_document(content):
         )
         conn.commit()
         update_bm25_index(cursor, normalize_content)  # Update BM25 index
-        print(f"\033[32mSuccessfully inserted document (language: {language}).\033[0m")
+        print(
+            f"{cs.GREEN}Successfully inserted document (language: {language}).{cs.RESET}"
+        )
     except Exception as e:
-        print(f"\033[31mError inserting document: {e}\033[0m")
+        print(f"{cs.RED}Error inserting document: {e}{cs.RESET}")
         conn.rollback()
         return False
 
 
 def search(query, top_k=DEFAULT_TOP_K, threshold=DEFAULT_THRESHOLD, bm25_weight=0.5):
     if check_if_empty_input(query):
-        print("\033[31mInput cannot be empty.\033[0m")
+        print(f"{cs.RED}mInput cannot be empty.{cs.RESET}")
         return []
     nor_query = normalize_content(query)
     print(f"Input: {query} -> Normalized: {nor_query}")
     try:
         query_vec = model.encode(nor_query).tolist()
         vec_str = f"[{','.join(map(str, query_vec))}]"
+        # print(vec_str)
         cursor.execute(
             """
             SELECT d.id, d.content, (1 - (e.embedding <=> %s::vector)) AS similarity, 
@@ -69,11 +80,13 @@ def search(query, top_k=DEFAULT_TOP_K, threshold=DEFAULT_THRESHOLD, bm25_weight=
         semantic_results = [
             (row[0], row[1], float(row[2]), row[3], row[4]) for row in rows
         ]
-        print(f"Semantic results: {len(semantic_results)} documents")
+        print(
+            f"Semantic results:{cs.OKGREEN}{cs.BOLD}{len(semantic_results)}{cs.NORMAL}{cs.RESET} documents"
+        )
 
         update_bm25_index(cursor, normalize_content)
         if bm25_index is None or not bm25_corpus:
-            print("\033[33mBM25 index empty, using semantic search only.\033[0m")
+            print(f"{cs.YELLOW}BM25 index empty, using semantic search only.{cs.RESET}")
             results = semantic_results
         else:
             bm25_scores = bm25_index.get_scores(nor_query.split())
@@ -124,15 +137,18 @@ def search(query, top_k=DEFAULT_TOP_K, threshold=DEFAULT_THRESHOLD, bm25_weight=
             ]
             results.sort(key=lambda x: x[2], reverse=True)
     except Exception as e:
-        print(f"\033[31mError during search: {e}\033[0m")
+        print(f"{cs.RED}Error during search: {e}{cs.RESET}")
         return []
     if not results:
-        print("\033[31mNo relevant results found.\033[0m")
+        print(f"{cs.RED}No relevant results found.{cs.RESET}")
         return []
     display_results(results[:top_k], query=nor_query)
-    print(
-        f"\033[33mLanguages found: {[lang for _, _, _, lang, _ in results[:top_k] if lang]}\033[0m"
-    )
+    #  Print unique languages found
+    langs = [lang for _, _, _, lang, _ in results[:top_k] if lang]
+    label = "Language Found" if len(langs) == 1 else "Languages Found"
+    print(f"{cs.YELLOW}{label}: {langs}{cs.RESET}\n")
+
+    # Return top_k results
     return results[:top_k]
 
 
