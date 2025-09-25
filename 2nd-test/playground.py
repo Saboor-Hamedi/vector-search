@@ -39,13 +39,13 @@ def insert_document(content):
         print("\033[32mSuccessfully inserted a new document.\033[0m")
         return True
     print("\033[31mFailed to insert the document.\033[0m")
-    return False
+    return []
 
 
 def search(query, top_k=DEFAULT_TOP_K, threshold=DEFAULT_THRESHOLD):
     if check_if_empty_input(query):
         print("\033[31mInput cannot be empty.\033[0m")
-        return False
+        return []
 
     query_vec = model.encode(query).tolist()
     cursor.execute("""
