@@ -3,3 +3,5 @@ docs/
 *.sql
 *.ini
 *.log
+__pycache__/
+env/
